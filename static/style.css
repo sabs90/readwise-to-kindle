@@ -212,7 +212,7 @@ header h1 {
     text-transform: uppercase;
     letter-spacing: 0.05em;
     position: sticky;
-    top: 140px;
+    top: 500px;
     z-index: 98;
 }
 
