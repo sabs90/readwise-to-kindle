@@ -5,10 +5,12 @@ Common issues and their solutions.
 ## Table of Contents
 
 1. [Application Won't Start](#application-wont-start)
-2. [No Articles Displayed](#no-articles-displayed)
-3. [EPUB Creation Fails](#epub-creation-fails)
-4. [Email Sending Fails](#email-sending-fails)
-5. [Kindle Not Receiving Documents](#kindle-not-receiving-documents)
+2. [Login Issues](#login-issues)
+3. [No Articles Displayed](#no-articles-displayed)
+4. [EPUB Creation Fails](#epub-creation-fails)
+5. [Email Sending Fails](#email-sending-fails)
+6. [Kindle Not Receiving Documents](#kindle-not-receiving-documents)
+7. [Deployment Issues](#deployment-issues)
 
 ---
 
@@ -43,6 +45,55 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your credentials
 ```
+
+---
+
+## Login Issues
+
+### Password Not Working
+
+**Possible Causes**:
+
+1. **Server started before adding password to .env**
+   - Environment variables are only loaded at startup
+   - Solution: Restart the server after updating `.env`
+
+2. **APP_PASSWORD not set**
+   - Check that `APP_PASSWORD` is defined in your `.env` file
+   - Ensure no typos in the variable name
+
+3. **Extra whitespace**
+   - Remove any leading/trailing spaces from the password value
+   - Example: `APP_PASSWORD=mypassword` (no spaces)
+
+### Redirected to Login After Every Request
+
+**Cause**: Session not persisting
+
+**Possible Solutions**:
+
+1. **SECRET_KEY not set**
+   - Add `SECRET_KEY=any_random_string` to `.env`
+   - Restart the server
+
+2. **Cookies blocked**
+   - Ensure your browser accepts cookies from localhost
+   - Try a different browser
+
+3. **Using HTTP in production**
+   - Session cookies are marked secure in production
+   - Ensure you're using HTTPS (Railway provides this automatically)
+
+### "Invalid password" Even With Correct Password
+
+**Solution**: Check for hidden characters:
+
+```bash
+# View your .env file contents with hidden characters visible
+cat -A .env | grep APP_PASSWORD
+```
+
+Look for unexpected `^M` (Windows line endings) or other characters.
 
 ---
 
@@ -229,6 +280,110 @@ except Exception as e:
 "
 ```
 
+---
+
+## Deployment Issues
+
+### Railway Deploy Fails
+
+**Check the build logs** in Railway dashboard for specific errors.
+
+**Common issues**:
+
+1. **Missing Procfile**
+   - Ensure `Procfile` exists with: `web: gunicorn app:app`
+
+2. **Missing gunicorn in requirements.txt**
+   - Add `gunicorn==21.2.0` to `requirements.txt`
+
+3. **Python version issues**
+   - Railway auto-detects Python; usually works out of the box
+
+### App Crashes on Railway
+
+**Check deployment logs** for errors.
+
+**Common causes**:
+
+1. **Missing environment variables**
+   - Ensure all required variables are set in Railway dashboard
+   - Required: `READWISE_API_TOKEN`, `KINDLE_EMAIL`, `SMTP_*`, `APP_PASSWORD`, `SECRET_KEY`
+
+2. **Invalid SECRET_KEY**
+   - Generate a new one: `python3 -c "import secrets; print(secrets.token_hex(32))"`
+
+### Login Works Locally But Not on Railway
+
+**Cause**: Cookies not being set correctly
+
+**Solutions**:
+
+1. **Use HTTPS**
+   - Railway provides free SSL; always use the HTTPS URL
+
+2. **Check SESSION_COOKIE_SECURE setting**
+   - The app automatically sets secure cookies when `FLASK_ENV=production`
+   - Add `FLASK_ENV=production` to Railway environment variables
+
+### EPUB Files Not Persisting
+
+**Note**: This is expected behavior on cloud platforms.
+
+- Temp files are stored in the container's `/tmp` directory
+- Files may be cleared when the container restarts
+- This is fine for normal use (create → send immediately)
+- For long-term storage, consider adding cloud storage integration
+
+---
+
+## Getting More Help
+
+### Enable Debug Logging
+
+The Flask server runs in debug mode by default. Check the terminal for detailed error messages.
+
+### Test API Connection
+
+```bash
+source venv/bin/activate
+python3 -c "
+import requests
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+token = os.getenv('READWISE_API_TOKEN')
+response = requests.get(
+    'https://readwise.io/api/v3/list/',
+    headers={'Authorization': f'Token {token}'},
+    params={'pageSize': 1},
+    timeout=30
+)
+print(f'Status: {response.status_code}')
+print(f'Response: {response.text[:200]}')
+"
+```
+
+### Test SMTP Connection
+
+```bash
+source venv/bin/activate
+python3 -c "
+import smtplib
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+try:
+    with smtplib.SMTP(os.getenv('SMTP_SERVER'), int(os.getenv('SMTP_PORT'))) as server:
+        server.starttls()
+        server.login(os.getenv('SMTP_EMAIL'), os.getenv('SMTP_PASSWORD'))
+        print('SMTP connection successful!')
+except Exception as e:
+    print(f'SMTP error: {e}')
+"
+```
+
 ### Report Issues
 
 If you encounter a bug not covered here, please open an issue at:
@@ -239,3 +394,4 @@ Include:
 - Steps to reproduce
 - Python version (`python3 --version`)
 - Operating system
+- Deployment environment (local or Railway)

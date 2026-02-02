@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Readwise to Kindle</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="login-card">
+            <header>
+                <h1>Readwise to Kindle</h1>
+                <p class="subtitle">Enter password to continue</p>
+            </header>
+
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% endif %}
+
+            <form method="POST" class="login-form">
+                <div class="form-group">
+                    <input type="password" name="password" placeholder="Password" autofocus required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Login</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

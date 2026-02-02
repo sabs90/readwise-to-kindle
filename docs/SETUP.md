@@ -9,6 +9,8 @@ This guide walks you through configuring all required services for Readwise to K
 3. [Gmail SMTP Configuration](#3-gmail-smtp-configuration)
 4. [Amazon Approved Senders](#4-amazon-approved-senders)
 5. [Environment Configuration](#5-environment-configuration)
+6. [Authentication Setup](#6-authentication-setup)
+7. [Deployment to Railway](#7-deployment-to-railway)
 
 ---
 
@@ -182,3 +184,93 @@ Common validation errors:
 
 **Gmail App Password**:
 - Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) and remove the app password
+
+---
+
+## 6. Authentication Setup
+
+The app includes password protection for deployment. This is optional for local use but required when deploying to the web.
+
+### Configuration
+
+Add these variables to your `.env` file:
+
+```bash
+# Password for logging into the app
+APP_PASSWORD=your_secure_password
+
+# Secret key for session encryption (generate a random string)
+SECRET_KEY=your_random_32_character_string
+```
+
+### Generating a Secret Key
+
+```bash
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+### Notes
+
+- If `APP_PASSWORD` is not set, login will fail
+- The `SECRET_KEY` should be unique and kept secret
+- For local development, any values work; for production, use strong values
+- Sessions use secure, httponly cookies with SameSite=Lax
+
+---
+
+## 7. Deployment to Railway
+
+Railway is a cloud platform that auto-detects Python apps and provides free SSL.
+
+### Prerequisites
+
+- GitHub account with your repo pushed
+- Railway account (sign up at [railway.app](https://railway.app))
+
+### Steps
+
+1. **Push to GitHub**
+   ```bash
+   git add .
+   git commit -m "Prepare for deployment"
+   git push origin main
+   ```
+
+2. **Create Railway Project**
+   - Go to [railway.app](https://railway.app) and sign in
+   - Click "New Project" → "Deploy from GitHub repo"
+   - Select your repository
+
+3. **Configure Environment Variables**
+
+   In Railway dashboard, go to your project → Variables → Add these:
+
+   | Variable | Value |
+   |----------|-------|
+   | `READWISE_API_TOKEN` | Your Readwise token |
+   | `KINDLE_EMAIL` | your_kindle@kindle.com |
+   | `SMTP_SERVER` | smtp.gmail.com |
+   | `SMTP_PORT` | 587 |
+   | `SMTP_EMAIL` | your_email@gmail.com |
+   | `SMTP_PASSWORD` | Your app password |
+   | `APP_PASSWORD` | Your login password |
+   | `SECRET_KEY` | Random 32+ char string |
+
+4. **Deploy**
+   - Railway auto-detects the `Procfile` and deploys
+   - Click "Generate Domain" to get a public URL
+
+### Railway Features
+
+- **Free tier**: $5/month credit (sufficient for personal use)
+- **No cold starts**: Unlike some free tiers, always responsive
+- **Auto-deploy**: Pushes to GitHub trigger new deploys
+- **Free SSL**: HTTPS enabled automatically
+
+### Verification
+
+1. Visit your Railway URL
+2. You should see the login page
+3. Enter your `APP_PASSWORD`
+4. Verify articles load and EPUB creation works
+5. Test sending to Kindle

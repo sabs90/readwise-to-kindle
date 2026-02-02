@@ -36,6 +36,23 @@ python app.py
 
 The browser will open automatically to `http://localhost:5000`.
 
+## Deployment
+
+The app can be deployed to Railway for cloud access with password protection.
+
+```bash
+# Test with gunicorn locally
+gunicorn app:app
+
+# Deploy to Railway
+# 1. Push to GitHub
+# 2. Connect repo in Railway dashboard
+# 3. Set environment variables (see Configuration)
+# 4. Deploy
+```
+
+See [SETUP.md](SETUP.md) for detailed deployment instructions.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and fill in your credentials:
@@ -47,6 +64,10 @@ SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
 SMTP_EMAIL=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
+
+# Authentication (required for deployment, optional for local)
+APP_PASSWORD=your_secure_password
+SECRET_KEY=generate_a_random_32_char_string
 ```
 
 See [SETUP.md](SETUP.md) for detailed instructions on obtaining each credential.

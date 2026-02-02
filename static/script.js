@@ -76,6 +76,14 @@ function debounce(func, wait) {
     };
 }
 
+function handleUnauthorized(response) {
+    if (response.status === 401) {
+        window.location.href = '/login';
+        return true;
+    }
+    return false;
+}
+
 async function fetchArticles() {
     showLoading('Loading articles...');
     hideError();
@@ -89,6 +97,7 @@ async function fetchArticles() {
 
     try {
         const response = await fetch(url);
+        if (handleUnauthorized(response)) return;
         const data = await response.json();
 
         if (!response.ok) {
@@ -277,6 +286,7 @@ async function createAndSend() {
             body: JSON.stringify({ article_ids: Array.from(selectedIds) })
         });
 
+        if (handleUnauthorized(createResponse)) return;
         const createData = await createResponse.json();
 
         if (!createResponse.ok) {
@@ -301,6 +311,7 @@ async function createAndSend() {
             })
         });
 
+        if (handleUnauthorized(sendResponse)) return;
         const sendData = await sendResponse.json();
 
         if (!sendResponse.ok) {
@@ -330,6 +341,7 @@ async function downloadEpub() {
                 body: JSON.stringify({ article_ids: Array.from(selectedIds) })
             });
 
+            if (handleUnauthorized(createResponse)) return;
             const createData = await createResponse.json();
 
             if (!createResponse.ok) {
@@ -351,6 +363,7 @@ async function downloadEpub() {
             })
         });
 
+        if (handleUnauthorized(downloadResponse)) return;
         if (!downloadResponse.ok) {
             const errData = await downloadResponse.json();
             throw new Error(errData.error || 'Failed to download EPUB');
