@@ -169,7 +169,7 @@ def clean_html_for_epub(html_content, title, author=None):
     if not html_content:
         html_content = "<p>No content available.</p>"
 
-    soup = BeautifulSoup(html_content, "lxml")
+    soup = BeautifulSoup(html_content, "html.parser")
 
     # Remove script and style tags
     for tag in soup.find_all(["script", "style"]):
