@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Readwise to Kindle</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Readwise to Kindle</h1>
+            <p class="subtitle">Select articles to send to your Kindle</p>
+        </header>
+
+        <div class="controls">
+            <div class="filter-group">
+                <label for="location-filter">Filter by location:</label>
+                <select id="location-filter">
+                    <option value="new" selected>Inbox</option>
+                    <option value="later">Later</option>
+                    <option value="archive">Archive</option>
+                    <option value="feed">Feed</option>
+                    <option value="">All</option>
+                </select>
+
+                <input type="text" id="search-input" placeholder="Search articles...">
+            </div>
+
+            <div class="action-buttons">
+                <button id="select-all-btn" class="btn btn-secondary">Select All</button>
+                <button id="deselect-all-btn" class="btn btn-secondary">Deselect All</button>
+                <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
+            </div>
+        </div>
+
+        <div class="selection-info">
+            <span id="selected-count">0</span> articles selected
+            <span id="total-reading-time"></span>
+            <div class="action-buttons-inline">
+                <button id="create-send-btn" class="btn btn-primary" disabled>
+                    Create & Send to Kindle
+                </button>
+                <button id="download-btn" class="btn btn-secondary" disabled>
+                    Download EPUB
+                </button>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p id="loading-text">Loading articles...</p>
+        </div>
+
+        <div id="error" class="error hidden"></div>
+
+        <div id="articles-container" class="articles-container hidden">
+            <table id="articles-table">
+                <thead>
+                    <tr>
+                        <th class="checkbox-col"></th>
+                        <th class="sortable" data-sort="title">Title <span class="sort-icon"></span></th>
+                        <th class="sortable" data-sort="author">Author <span class="sort-icon"></span></th>
+                        <th class="sortable" data-sort="site_name">Source <span class="sort-icon"></span></th>
+                        <th class="sortable" data-sort="word_count">Words <span class="sort-icon"></span></th>
+                        <th class="sortable" data-sort="location">Location <span class="sort-icon"></span></th>
+                        <th class="sortable" data-sort="created_at">Saved <span class="sort-icon"></span></th>
+                    </tr>
+                </thead>
+                <tbody id="articles-body">
+                </tbody>
+            </table>
+        </div>
+
+        <div id="progress-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="spinner"></div>
+                <p id="progress-text">Processing...</p>
+            </div>
+        </div>
+
+        <div id="success-modal" class="modal hidden">
+            <div class="modal-content success">
+                <h2>Success!</h2>
+                <p id="success-text"></p>
+                <button id="close-success-btn" class="btn btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
