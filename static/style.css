@@ -58,6 +58,9 @@ header h1 {
     background: white;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
 .filter-group {
@@ -133,6 +136,9 @@ header h1 {
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 0.5rem;
+    position: sticky;
+    top: 66px;
+    z-index: 99;
 }
 
 .action-buttons-inline {
@@ -205,6 +211,9 @@ header h1 {
     font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    position: sticky;
+    top: 118px;
+    z-index: 98;
 }
 
 #articles-table th.sortable {
