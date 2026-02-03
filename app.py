@@ -1,7 +1,11 @@
 import base64
 import os
+import smtplib
 import tempfile
 from datetime import datetime
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from functools import wraps
 
 import requests
@@ -24,10 +28,18 @@ app.config.update(
 APP_PASSWORD = os.getenv("APP_PASSWORD")
 READWISE_API_TOKEN = os.getenv("READWISE_API_TOKEN")
 KINDLE_EMAIL = os.getenv("KINDLE_EMAIL")
+
+# Resend (for cloud deployment)
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
 
-resend.api_key = RESEND_API_KEY
+# SMTP (for local use)
+SMTP_SERVER = os.getenv("SMTP_SERVER")
+SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
+SMTP_EMAIL = os.getenv("SMTP_EMAIL")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 READWISE_API_BASE = "https://readwise.io/api/v3"
 
@@ -326,7 +338,7 @@ def download_epub():
 @app.route("/api/send-to-kindle", methods=["POST"])
 @login_required
 def send_to_kindle():
-    """Send the EPUB file to Kindle via Resend."""
+    """Send the EPUB file to Kindle via Resend (cloud) or SMTP (local)."""
     data = request.get_json()
     filepath = data.get("filepath")
     filename = data.get("filename")
@@ -334,18 +346,22 @@ def send_to_kindle():
     if not filepath or not os.path.exists(filepath):
         return jsonify({"error": "EPUB file not found"}), 404
 
-    if not RESEND_API_KEY:
-        return jsonify({"error": "RESEND_API_KEY not configured."}), 400
-
     if not KINDLE_EMAIL or KINDLE_EMAIL == "your_kindle@kindle.com":
         return jsonify({"error": "Please configure your Kindle email."}), 400
 
+    # Use Resend if API key is set, otherwise use SMTP
+    if RESEND_API_KEY:
+        return send_via_resend(filepath, filename)
+    else:
+        return send_via_smtp(filepath, filename)
+
+
+def send_via_resend(filepath, filename):
+    """Send email using Resend API (for cloud deployment)."""
     try:
-        # Read and encode the EPUB file
         with open(filepath, "rb") as f:
             epub_content = base64.b64encode(f.read()).decode("utf-8")
 
-        # Send via Resend
         params = {
             "from": FROM_EMAIL,
             "to": [KINDLE_EMAIL],
@@ -359,19 +375,57 @@ def send_to_kindle():
             ],
         }
 
-        email = resend.Emails.send(params)
+        resend.Emails.send(params)
         return jsonify({"success": True, "message": f"Sent to {KINDLE_EMAIL}"})
 
     except Exception as e:
         return jsonify({"error": f"Failed to send email: {str(e)}"}), 500
 
 
+def send_via_smtp(filepath, filename):
+    """Send email using SMTP (for local use)."""
+    if not all([SMTP_SERVER, SMTP_EMAIL, SMTP_PASSWORD]):
+        return jsonify({"error": "SMTP configuration incomplete. Check your .env file."}), 400
+
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = SMTP_EMAIL
+        msg["To"] = KINDLE_EMAIL
+        msg["Subject"] = f"Readwise Digest - {datetime.now().strftime('%Y-%m-%d')}"
+
+        body = "Your Readwise digest is attached."
+        msg.attach(MIMEText(body, "plain"))
+
+        with open(filepath, "rb") as f:
+            attachment = MIMEApplication(f.read(), _subtype="epub+zip")
+            attachment.add_header("Content-Disposition", "attachment", filename=filename)
+            msg.attach(attachment)
+
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30) as server:
+            server.starttls()
+            server.login(SMTP_EMAIL, SMTP_PASSWORD)
+            server.send_message(msg)
+
+        return jsonify({"success": True, "message": f"Sent to {KINDLE_EMAIL}"})
+
+    except smtplib.SMTPAuthenticationError:
+        return jsonify({"error": "SMTP authentication failed. Check your email credentials."}), 401
+    except smtplib.SMTPException as e:
+        return jsonify({"error": f"Failed to send email: {str(e)}"}), 500
+    except TimeoutError:
+        return jsonify({"error": "SMTP connection timed out."}), 504
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+
+
 if __name__ == "__main__":
     import webbrowser
     from threading import Timer
 
+    port = int(os.getenv("PORT", 5001))
+
     def open_browser():
-        webbrowser.open("http://localhost:5000")
+        webbrowser.open(f"http://localhost:{port}")
 
     Timer(1.5, open_browser).start()
-    app.run(debug=True, host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+    app.run(debug=True, host="0.0.0.0", port=port)

@@ -11,6 +11,7 @@ This guide walks you through configuring all required services for Readwise to K
 5. [Environment Configuration](#5-environment-configuration)
 6. [Authentication Setup](#6-authentication-setup)
 7. [Deployment to Railway](#7-deployment-to-railway)
+8. [Outstanding: Resend Setup for Cloud Deployment](#outstanding-resend-setup-for-cloud-deployment)
 
 ---
 
@@ -222,10 +223,13 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 
 Railway is a cloud platform that auto-detects Python apps and provides free SSL.
 
+**Important**: Railway blocks outbound SMTP connections. You must use Resend (email API) for cloud deployment.
+
 ### Prerequisites
 
 - GitHub account with your repo pushed
 - Railway account (sign up at [railway.app](https://railway.app))
+- Resend account with verified domain (see "Outstanding Setup" below)
 
 ### Steps
 
@@ -249,10 +253,8 @@ Railway is a cloud platform that auto-detects Python apps and provides free SSL.
    |----------|-------|
    | `READWISE_API_TOKEN` | Your Readwise token |
    | `KINDLE_EMAIL` | your_kindle@kindle.com |
-   | `SMTP_SERVER` | smtp.gmail.com |
-   | `SMTP_PORT` | 587 |
-   | `SMTP_EMAIL` | your_email@gmail.com |
-   | `SMTP_PASSWORD` | Your app password |
+   | `RESEND_API_KEY` | Your Resend API key |
+   | `FROM_EMAIL` | noreply@yourdomain.com |
    | `APP_PASSWORD` | Your login password |
    | `SECRET_KEY` | Random 32+ char string |
 
@@ -274,3 +276,38 @@ Railway is a cloud platform that auto-detects Python apps and provides free SSL.
 3. Enter your `APP_PASSWORD`
 4. Verify articles load and EPUB creation works
 5. Test sending to Kindle
+
+---
+
+## Outstanding: Resend Setup for Cloud Deployment
+
+To deploy to the cloud (Railway), you need to set up Resend with a verified domain. SMTP is blocked on most cloud platforms.
+
+### Steps
+
+1. **Sign up at [resend.com](https://resend.com)**
+
+2. **Verify a domain you own**
+   - Go to [resend.com/domains](https://resend.com/domains)
+   - Add your domain (e.g., `yourdomain.com`)
+   - Add the DNS records Resend provides (SPF, DKIM)
+   - Wait for verification (usually a few minutes)
+
+3. **Get your API key**
+   - Go to [resend.com/api-keys](https://resend.com/api-keys)
+   - Create a new API key
+   - Copy it for use in Railway
+
+4. **Add sender to Amazon approved list**
+   - Go to [amazon.com/myk](https://amazon.com/myk) → Preferences → Personal Document Settings
+   - Add your verified email (e.g., `noreply@yourdomain.com`) to approved senders
+
+5. **Configure Railway**
+   - Add `RESEND_API_KEY` and `FROM_EMAIL` to Railway environment variables
+   - Remove any SMTP variables (they won't work anyway)
+
+### Notes
+
+- Resend free tier: 3,000 emails/month (more than enough for personal use)
+- The app automatically uses Resend when `RESEND_API_KEY` is set, otherwise falls back to SMTP
+- You can test locally with SMTP, then deploy with Resend

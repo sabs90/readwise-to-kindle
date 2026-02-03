@@ -34,7 +34,9 @@ cp .env.example .env
 python app.py
 ```
 
-The browser will open automatically to `http://localhost:5000`.
+The browser will open automatically to `http://localhost:5001`.
+
+**Or use the shortcut**: Double-click `Start Readwise to Kindle.command` to launch the app.
 
 ## Deployment
 
@@ -60,10 +62,16 @@ Copy `.env.example` to `.env` and fill in your credentials:
 ```
 READWISE_API_TOKEN=your_token_here
 KINDLE_EMAIL=your_kindle@kindle.com
+
+# SMTP (for local use)
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
 SMTP_EMAIL=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
+
+# Resend (for cloud deployment - requires verified domain)
+# RESEND_API_KEY=re_xxxxxxxxx
+# FROM_EMAIL=noreply@yourdomain.com
 
 # Authentication (required for deployment, optional for local)
 APP_PASSWORD=your_secure_password
@@ -90,8 +98,8 @@ See [SETUP.md](SETUP.md) for detailed instructions on obtaining each credential.
 - **Backend**: Python 3.12, Flask
 - **Frontend**: Vanilla HTML/CSS/JavaScript
 - **EPUB Generation**: ebooklib
-- **HTML Processing**: BeautifulSoup, lxml
-- **Email**: smtplib (built-in)
+- **HTML Processing**: BeautifulSoup
+- **Email**: smtplib (local) / Resend API (cloud)
 
 ## Requirements
 
