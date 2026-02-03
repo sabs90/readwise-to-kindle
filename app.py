@@ -1,13 +1,11 @@
+import base64
 import os
-import smtplib
 import tempfile
 from datetime import datetime
-from email.mime.application import MIMEApplication
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from functools import wraps
 
 import requests
+import resend
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from ebooklib import epub
@@ -26,10 +24,10 @@ app.config.update(
 APP_PASSWORD = os.getenv("APP_PASSWORD")
 READWISE_API_TOKEN = os.getenv("READWISE_API_TOKEN")
 KINDLE_EMAIL = os.getenv("KINDLE_EMAIL")
-SMTP_SERVER = os.getenv("SMTP_SERVER")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SMTP_EMAIL = os.getenv("SMTP_EMAIL")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
+
+resend.api_key = RESEND_API_KEY
 
 READWISE_API_BASE = "https://readwise.io/api/v3"
 
@@ -328,7 +326,7 @@ def download_epub():
 @app.route("/api/send-to-kindle", methods=["POST"])
 @login_required
 def send_to_kindle():
-    """Send the EPUB file to Kindle via email."""
+    """Send the EPUB file to Kindle via Resend."""
     data = request.get_json()
     filepath = data.get("filepath")
     filename = data.get("filename")
@@ -336,44 +334,36 @@ def send_to_kindle():
     if not filepath or not os.path.exists(filepath):
         return jsonify({"error": "EPUB file not found"}), 404
 
-    if not all([KINDLE_EMAIL, SMTP_SERVER, SMTP_EMAIL, SMTP_PASSWORD]):
-        return jsonify({"error": "Email configuration incomplete. Check your .env file."}), 400
+    if not RESEND_API_KEY:
+        return jsonify({"error": "RESEND_API_KEY not configured."}), 400
 
-    if KINDLE_EMAIL == "your_kindle@kindle.com":
-        return jsonify({"error": "Please configure your Kindle email in the .env file."}), 400
+    if not KINDLE_EMAIL or KINDLE_EMAIL == "your_kindle@kindle.com":
+        return jsonify({"error": "Please configure your Kindle email."}), 400
 
     try:
-        # Create email
-        msg = MIMEMultipart()
-        msg["From"] = SMTP_EMAIL
-        msg["To"] = KINDLE_EMAIL
-        msg["Subject"] = f"Readwise Digest - {datetime.now().strftime('%Y-%m-%d')}"
-
-        body = "Your Readwise digest is attached."
-        msg.attach(MIMEText(body, "plain"))
-
-        # Attach EPUB
+        # Read and encode the EPUB file
         with open(filepath, "rb") as f:
-            attachment = MIMEApplication(f.read(), _subtype="epub+zip")
-            attachment.add_header("Content-Disposition", "attachment", filename=filename)
-            msg.attach(attachment)
+            epub_content = base64.b64encode(f.read()).decode("utf-8")
 
-        # Send email (with 30 second timeout)
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30) as server:
-            server.starttls()
-            server.login(SMTP_EMAIL, SMTP_PASSWORD)
-            server.send_message(msg)
+        # Send via Resend
+        params = {
+            "from": FROM_EMAIL,
+            "to": [KINDLE_EMAIL],
+            "subject": f"Readwise Digest - {datetime.now().strftime('%Y-%m-%d')}",
+            "text": "Your Readwise digest is attached.",
+            "attachments": [
+                {
+                    "filename": filename,
+                    "content": epub_content,
+                }
+            ],
+        }
 
+        email = resend.Emails.send(params)
         return jsonify({"success": True, "message": f"Sent to {KINDLE_EMAIL}"})
 
-    except smtplib.SMTPAuthenticationError:
-        return jsonify({"error": "SMTP authentication failed. Check your email credentials."}), 401
-    except smtplib.SMTPException as e:
-        return jsonify({"error": f"Failed to send email: {str(e)}"}), 500
-    except TimeoutError:
-        return jsonify({"error": "SMTP connection timed out. The email server may be unreachable."}), 504
     except Exception as e:
-        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to send email: {str(e)}"}), 500
 
 
 if __name__ == "__main__":

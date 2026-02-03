@@ -4,3 +4,4 @@ python-dotenv==1.0.0
 ebooklib==0.18
 beautifulsoup4==4.12.2
 gunicorn==21.2.0
+resend==2.0.0
