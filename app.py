@@ -358,8 +358,8 @@ def send_to_kindle():
             attachment.add_header("Content-Disposition", "attachment", filename=filename)
             msg.attach(attachment)
 
-        # Send email
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        # Send email (with 30 second timeout)
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30) as server:
             server.starttls()
             server.login(SMTP_EMAIL, SMTP_PASSWORD)
             server.send_message(msg)
@@ -370,6 +370,8 @@ def send_to_kindle():
         return jsonify({"error": "SMTP authentication failed. Check your email credentials."}), 401
     except smtplib.SMTPException as e:
         return jsonify({"error": f"Failed to send email: {str(e)}"}), 500
+    except TimeoutError:
+        return jsonify({"error": "SMTP connection timed out. The email server may be unreachable."}), 504
     except Exception as e:
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
