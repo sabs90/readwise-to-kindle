@@ -1,5 +1,6 @@
 let articles = [];
 let selectedIds = new Set();
+let uploadedPdfs = [];
 let currentEpub = null;
 let sortColumn = 'created_at';
 let sortDirection = 'desc';
@@ -18,6 +19,9 @@ const createSendBtn = document.getElementById('create-send-btn');
 const downloadBtn = document.getElementById('download-btn');
 const locationFilter = document.getElementById('location-filter');
 const searchInput = document.getElementById('search-input');
+const pdfInput = document.getElementById('pdf-input');
+const addPdfBtn = document.getElementById('add-pdf-btn');
+const pdfListEl = document.getElementById('pdf-list');
 const progressModal = document.getElementById('progress-modal');
 const progressText = document.getElementById('progress-text');
 const successModal = document.getElementById('success-modal');
@@ -39,6 +43,8 @@ function setupEventListeners() {
     locationFilter.addEventListener('change', () => fetchArticles());
     searchInput.addEventListener('input', debounce(filterArticles, 300));
     closeSuccessBtn.addEventListener('click', () => successModal.classList.add('hidden'));
+    addPdfBtn.addEventListener('click', () => pdfInput.click());
+    pdfInput.addEventListener('change', uploadPdf);
 
     // Sort headers
     document.querySelectorAll('.sortable').forEach(th => {
@@ -246,6 +252,65 @@ function deselectAll() {
     currentEpub = null;
 }
 
+async function uploadPdf() {
+    const files = pdfInput.files;
+    if (!files.length) return;
+
+    for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            showProgress(`Uploading ${file.name}...`);
+            const response = await fetch('/api/upload-pdf', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (handleUnauthorized(response)) return;
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to upload PDF');
+            }
+
+            uploadedPdfs.push(data);
+            currentEpub = null;
+        } catch (err) {
+            hideProgress();
+            showError(err.message);
+            pdfInput.value = '';
+            return;
+        }
+    }
+
+    hideProgress();
+    pdfInput.value = '';
+    renderPdfList();
+    updateSelectionInfo();
+}
+
+function renderPdfList() {
+    if (uploadedPdfs.length === 0) {
+        pdfListEl.innerHTML = '';
+        return;
+    }
+
+    pdfListEl.innerHTML = uploadedPdfs.map(pdf => `
+        <span class="pdf-chip" data-id="${pdf.id}">
+            ${pdf.title} <small>(${pdf.word_count.toLocaleString()} words)</small>
+            <button class="pdf-chip-remove" onclick="removePdf('${pdf.id}')">&times;</button>
+        </span>
+    `).join('');
+}
+
+function removePdf(id) {
+    uploadedPdfs = uploadedPdfs.filter(p => p.id !== id);
+    currentEpub = null;
+    renderPdfList();
+    updateSelectionInfo();
+}
+
 function updateSelectionInfo() {
     selectedCount.textContent = selectedIds.size;
 
@@ -256,6 +321,9 @@ function updateSelectionInfo() {
             totalWords += article.word_count || 0;
         }
     });
+    uploadedPdfs.forEach(pdf => {
+        totalWords += pdf.word_count || 0;
+    });
 
     if (totalWords > 0) {
         const mins = Math.ceil(totalWords / 200);
@@ -264,9 +332,9 @@ function updateSelectionInfo() {
         totalReadingTime.textContent = '';
     }
 
-    const hasSelection = selectedIds.size > 0;
-    createSendBtn.disabled = !hasSelection;
-    downloadBtn.disabled = !hasSelection;
+    const hasContent = selectedIds.size > 0 || uploadedPdfs.length > 0;
+    createSendBtn.disabled = !hasContent;
+    downloadBtn.disabled = !hasContent;
 }
 
 function filterArticles() {
@@ -274,7 +342,7 @@ function filterArticles() {
 }
 
 async function createAndSend() {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0 && uploadedPdfs.length === 0) return;
 
     showProgress('Fetching full article content...');
 
@@ -283,7 +351,10 @@ async function createAndSend() {
         const createResponse = await fetch('/api/create-epub', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ article_ids: Array.from(selectedIds) })
+            body: JSON.stringify({
+                article_ids: Array.from(selectedIds),
+                pdf_articles: uploadedPdfs
+            })
         });
 
         if (handleUnauthorized(createResponse)) return;
@@ -307,7 +378,8 @@ async function createAndSend() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 filepath: createData.filepath,
-                filename: createData.filename
+                filename: createData.filename,
+                digest_title: createData.digest_title
             })
         });
 
@@ -328,7 +400,7 @@ async function createAndSend() {
 }
 
 async function downloadEpub() {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0 && uploadedPdfs.length === 0) return;
 
     showProgress('Creating EPUB...');
 
@@ -338,7 +410,10 @@ async function downloadEpub() {
             const createResponse = await fetch('/api/create-epub', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ article_ids: Array.from(selectedIds) })
+                body: JSON.stringify({
+                    article_ids: Array.from(selectedIds),
+                    pdf_articles: uploadedPdfs
+                })
             });
 
             if (handleUnauthorized(createResponse)) return;

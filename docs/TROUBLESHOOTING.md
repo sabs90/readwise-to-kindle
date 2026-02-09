@@ -7,10 +7,11 @@ Common issues and their solutions.
 1. [Application Won't Start](#application-wont-start)
 2. [Login Issues](#login-issues)
 3. [No Articles Displayed](#no-articles-displayed)
-4. [EPUB Creation Fails](#epub-creation-fails)
-5. [Email Sending Fails](#email-sending-fails)
-6. [Kindle Not Receiving Documents](#kindle-not-receiving-documents)
-7. [Deployment Issues](#deployment-issues)
+4. [PDF Upload Issues](#pdf-upload-issues)
+5. [EPUB Creation Fails](#epub-creation-fails)
+6. [Email Sending Fails](#email-sending-fails)
+7. [Kindle Not Receiving Documents](#kindle-not-receiving-documents)
+8. [Deployment Issues](#deployment-issues)
 
 ---
 
@@ -129,6 +130,44 @@ Look for unexpected `^M` (Windows line endings) or other characters.
 
 ---
 
+## PDF Upload Issues
+
+### "Only PDF files are accepted"
+
+**Cause**: The selected file does not have a `.pdf` extension.
+
+**Solution**: Ensure you are uploading a valid PDF file.
+
+### "Failed to process PDF"
+
+**Possible Causes**:
+
+1. **Scanned/image-based PDF**
+   - The app only extracts text from text-based PDFs
+   - Scanned documents (images of pages) will produce empty or garbled results
+   - Solution: Use OCR software to convert the scanned PDF to a text-based PDF first
+
+2. **Corrupted PDF**
+   - The file may be damaged
+   - Solution: Try re-downloading or re-exporting the PDF
+
+### File Too Large (413 Error)
+
+**Cause**: The PDF exceeds the 16MB upload limit.
+
+**Solution**: Reduce the file size (e.g., compress the PDF or split it into parts).
+
+### Poor Formatting in Extracted Text
+
+**Cause**: Some PDFs have unusual internal structures (e.g., each line stored as a separate text block).
+
+**Notes**:
+- The app automatically joins lines within paragraphs and dehyphenates split words
+- Multi-column layouts may not extract perfectly
+- Academic papers with complex formatting may have minor issues
+
+---
+
 ## EPUB Creation Fails
 
 ### "Document is empty" Error
@@ -143,8 +182,8 @@ Look for unexpected `^M` (Windows line endings) or other characters.
 
 **Possible Causes**:
 
-1. **No articles selected**
-   - Select at least one article before clicking "Create & Send to Kindle"
+1. **No content selected**
+   - Select at least one article or upload at least one PDF before clicking "Create & Send to Kindle"
 
 2. **Article content unavailable**
    - Some articles may not have HTML content available

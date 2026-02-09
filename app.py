@@ -2,12 +2,14 @@ import base64
 import os
 import smtplib
 import tempfile
+import uuid
 from datetime import datetime
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import wraps
 
+import fitz  # PyMuPDF
 import requests
 import resend
 from bs4 import BeautifulSoup
@@ -23,6 +25,7 @@ app.config.update(
     SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production",
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
+    MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16MB upload limit
 )
 
 APP_PASSWORD = os.getenv("APP_PASSWORD")
@@ -40,6 +43,10 @@ SMTP_SERVER = os.getenv("SMTP_SERVER")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SMTP_EMAIL = os.getenv("SMTP_EMAIL")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+
+# Groq LLM (for digest title keywords)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 
 READWISE_API_BASE = "https://readwise.io/api/v3"
 
@@ -174,6 +181,102 @@ def get_article_content(article_id):
         return jsonify({"error": f"Failed to fetch article: {str(e)}"}), 500
 
 
+def extract_pdf_content(filepath):
+    """Extract text content from a PDF file as HTML."""
+    doc = fitz.open(filepath)
+    all_paragraphs = []
+
+    for page in doc:
+        # Use block-level extraction to get natural paragraph groupings
+        blocks = page.get_text("blocks")
+        for block in blocks:
+            if block[6] != 0:  # skip non-text blocks (images)
+                continue
+            text = block[4].strip()
+            if not text:
+                continue
+
+            # Join lines within each block, handling hyphenation
+            lines = text.split("\n")
+            paragraphs = []
+            current = ""
+            for line in lines:
+                stripped = line.strip()
+                if not stripped:
+                    if current:
+                        paragraphs.append(current)
+                        current = ""
+                    continue
+                if current.endswith("-") and stripped and stripped[0].islower():
+                    current = current[:-1] + stripped
+                elif current:
+                    current += " " + stripped
+                else:
+                    current = stripped
+            if current:
+                paragraphs.append(current)
+
+            all_paragraphs.extend(paragraphs)
+
+    doc.close()
+
+    # Merge paragraphs split across blocks: if a paragraph starts with a
+    # lowercase letter, it's a continuation of the previous one.
+    merged = []
+    for para in all_paragraphs:
+        if merged and para and para[0].islower():
+            if merged[-1].endswith("-"):
+                merged[-1] = merged[-1][:-1] + para
+            else:
+                merged[-1] += " " + para
+        else:
+            merged.append(para)
+
+    html_content = "\n".join(f"<p>{p}</p>" for p in merged)
+    word_count = len(" ".join(merged).split())
+    return {"html_content": html_content, "word_count": word_count}
+
+
+@app.route("/api/upload-pdf", methods=["POST"])
+@login_required
+def upload_pdf():
+    """Upload a PDF file and extract its text content."""
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"error": "No file selected"}), 400
+
+    if not file.filename.lower().endswith(".pdf"):
+        return jsonify({"error": "Only PDF files are accepted"}), 400
+
+    tmp_path = None
+    try:
+        # Save to temp file
+        fd, tmp_path = tempfile.mkstemp(suffix=".pdf")
+        os.close(fd)
+        file.save(tmp_path)
+
+        result = extract_pdf_content(tmp_path)
+
+        title = os.path.splitext(file.filename)[0]
+        return jsonify({
+            "id": f"pdf-{uuid.uuid4().hex[:8]}",
+            "title": title,
+            "author": "",
+            "html_content": result["html_content"],
+            "word_count": result["word_count"],
+            "source": "pdf",
+        })
+
+    except Exception as e:
+        return jsonify({"error": f"Failed to process PDF: {str(e)}"}), 500
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+
 def clean_html_for_epub(html_content, title, author=None):
     """Clean and prepare HTML content for EPUB."""
     if not html_content:
@@ -207,14 +310,87 @@ def clean_html_for_epub(html_content, title, author=None):
 </html>"""
 
 
-def create_epub(articles_data):
+def generate_keywords(titles):
+    """Use Groq LLM to generate a 1-2 word keyword per article title."""
+    if not GROQ_API_KEY or not titles:
+        return None
+
+    titles_text = "\n".join(f"- {t}" for t in titles)
+    prompt = (
+        f"For each article title below, produce exactly one keyword (1-2 words) "
+        f"that captures its core topic. Output one keyword per line, no numbering, "
+        f"no extra text.\n\n{titles_text}"
+    )
+
+    try:
+        resp = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": GROQ_MODEL,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.0,
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        text = resp.json()["choices"][0]["message"]["content"].strip()
+
+        keywords = []
+        for line in text.splitlines():
+            line = line.strip().lstrip("0123456789.-) ").strip()
+            if not line:
+                continue
+            # Enforce 2-word max
+            words = line.split()[:2]
+            keywords.append(" ".join(words))
+
+        if len(keywords) != len(titles):
+            return None
+        return keywords
+    except Exception:
+        return None
+
+
+def build_digest_title(articles_data):
+    """Build a digest title with LLM-generated keywords. Returns (display_title, safe_filename)."""
+    date_str = datetime.now().strftime("%Y%m%d")
+    titles = [a.get("title", "Untitled") for a in articles_data]
+    keywords = generate_keywords(titles)
+
+    if keywords:
+        # Truncate keywords to keep total title ~80 chars
+        prefix = f"R2K - {date_str}"
+        parts = []
+        length = len(prefix)
+        for kw in keywords:
+            addition = f" - {kw}"
+            if length + len(addition) > 80:
+                break
+            parts.append(kw)
+            length += len(addition)
+        if parts:
+            display_title = prefix + " - " + " - ".join(parts)
+        else:
+            display_title = prefix
+    else:
+        display_title = f"R2K - {date_str}"
+
+    safe_filename = display_title.replace(" ", "-") + ".epub"
+    return display_title, safe_filename
+
+
+def create_epub(articles_data, book_title, filename):
     """Create an EPUB file from the given articles."""
     book = epub.EpubBook()
 
     # Set metadata
     date_str = datetime.now().strftime("%Y-%m-%d")
     book.set_identifier(f"readwise-digest-{date_str}")
-    book.set_title(f"Readwise Digest - {date_str}")
+    book.set_title(book_title)
     book.set_language("en")
     book.add_author("Readwise")
 
@@ -266,11 +442,10 @@ def create_epub(articles_data):
     book.add_item(css)
 
     # Write to temp file
-    filename = f"readwise-digest-{date_str}.epub"
     filepath = os.path.join(tempfile.gettempdir(), filename)
     epub.write_epub(filepath, book)
 
-    return filepath, filename
+    return filepath
 
 
 @app.route("/api/create-epub", methods=["POST"])
@@ -279,8 +454,9 @@ def create_epub_endpoint():
     """Fetch content for selected articles and create EPUB."""
     data = request.get_json()
     article_ids = data.get("article_ids", [])
+    pdf_articles = data.get("pdf_articles", [])
 
-    if not article_ids:
+    if not article_ids and not pdf_articles:
         return jsonify({"error": "No articles selected"}), 400
 
     articles_data = []
@@ -306,15 +482,26 @@ def create_epub_endpoint():
         except requests.exceptions.RequestException as e:
             return jsonify({"error": f"Failed to fetch article {article_id}: {str(e)}"}), 500
 
+    # Append uploaded PDF articles
+    for pdf in pdf_articles:
+        articles_data.append({
+            "id": pdf.get("id", ""),
+            "title": pdf.get("title", "Untitled"),
+            "author": pdf.get("author", ""),
+            "html_content": pdf.get("html_content", ""),
+        })
+
     if not articles_data:
         return jsonify({"error": "No article content found"}), 404
 
     try:
-        filepath, filename = create_epub(articles_data)
+        display_title, filename = build_digest_title(articles_data)
+        filepath = create_epub(articles_data, display_title, filename)
         return jsonify({
             "success": True,
             "filepath": filepath,
             "filename": filename,
+            "digest_title": display_title,
             "article_count": len(articles_data),
         })
     except Exception as e:
@@ -342,6 +529,7 @@ def send_to_kindle():
     data = request.get_json()
     filepath = data.get("filepath")
     filename = data.get("filename")
+    digest_title = data.get("digest_title", f"R2K - {datetime.now().strftime('%Y%m%d')}")
 
     if not filepath or not os.path.exists(filepath):
         return jsonify({"error": "EPUB file not found"}), 404
@@ -351,12 +539,12 @@ def send_to_kindle():
 
     # Use Resend if API key is set, otherwise use SMTP
     if RESEND_API_KEY:
-        return send_via_resend(filepath, filename)
+        return send_via_resend(filepath, filename, digest_title)
     else:
-        return send_via_smtp(filepath, filename)
+        return send_via_smtp(filepath, filename, digest_title)
 
 
-def send_via_resend(filepath, filename):
+def send_via_resend(filepath, filename, subject):
     """Send email using Resend API (for cloud deployment)."""
     try:
         with open(filepath, "rb") as f:
@@ -365,7 +553,7 @@ def send_via_resend(filepath, filename):
         params = {
             "from": FROM_EMAIL,
             "to": [KINDLE_EMAIL],
-            "subject": f"Readwise Digest - {datetime.now().strftime('%Y-%m-%d')}",
+            "subject": subject,
             "text": "Your Readwise digest is attached.",
             "attachments": [
                 {
@@ -382,7 +570,7 @@ def send_via_resend(filepath, filename):
         return jsonify({"error": f"Failed to send email: {str(e)}"}), 500
 
 
-def send_via_smtp(filepath, filename):
+def send_via_smtp(filepath, filename, subject):
     """Send email using SMTP (for local use)."""
     if not all([SMTP_SERVER, SMTP_EMAIL, SMTP_PASSWORD]):
         return jsonify({"error": "SMTP configuration incomplete. Check your .env file."}), 400
@@ -391,7 +579,7 @@ def send_via_smtp(filepath, filename):
         msg = MIMEMultipart()
         msg["From"] = SMTP_EMAIL
         msg["To"] = KINDLE_EMAIL
-        msg["Subject"] = f"Readwise Digest - {datetime.now().strftime('%Y-%m-%d')}"
+        msg["Subject"] = subject
 
         body = "Your Readwise digest is attached."
         msg.attach(MIMEText(body, "plain"))

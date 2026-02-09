@@ -148,17 +148,66 @@ Fetches full HTML content for a specific article. **Requires authentication.**
 
 ---
 
+### POST /api/upload-pdf
+
+Uploads a PDF file and extracts its text content. **Requires authentication.**
+
+**Request Body**: `multipart/form-data`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `file` | file | PDF file (max 16MB) |
+
+**Response**
+
+```json
+{
+  "id": "pdf-a1b2c3d4",
+  "title": "Document Name",
+  "author": "",
+  "html_content": "<p>Extracted text...</p>",
+  "word_count": 5200,
+  "source": "pdf"
+}
+```
+
+**Error Responses**
+
+| Status | Description |
+|--------|-------------|
+| 400 | No file provided, no file selected, or not a PDF |
+| 401 | Unauthorized (not logged in) |
+| 413 | File exceeds 16MB limit |
+| 500 | Failed to process PDF |
+
+**Notes**:
+- Only text-based PDFs are supported (no OCR)
+- The file is processed in memory and not stored on the server
+- The title is derived from the filename (without the `.pdf` extension)
+
+---
+
 ### POST /api/create-epub
 
-Creates an EPUB file from selected articles. **Requires authentication.**
+Creates an EPUB file from selected articles and/or uploaded PDFs. **Requires authentication.**
 
 **Request Body**
 
 ```json
 {
-  "article_ids": ["01abc123...", "02def456...", "03ghi789..."]
+  "article_ids": ["01abc123...", "02def456...", "03ghi789..."],
+  "pdf_articles": [
+    {
+      "id": "pdf-a1b2c3d4",
+      "title": "Document Name",
+      "author": "",
+      "html_content": "<p>Extracted text...</p>"
+    }
+  ]
 }
 ```
+
+Both `article_ids` and `pdf_articles` are optional, but at least one must be provided.
 
 **Response**
 
@@ -175,7 +224,7 @@ Creates an EPUB file from selected articles. **Requires authentication.**
 
 | Status | Description |
 |--------|-------------|
-| 400 | No articles selected |
+| 400 | No articles or PDFs selected |
 | 401 | Unauthorized (not logged in) |
 | 404 | No article content found |
 | 500 | Failed to fetch article or create EPUB |

@@ -41,6 +41,8 @@
             <span id="selected-count">0</span> articles selected
             <span id="total-reading-time"></span>
             <div class="action-buttons-inline">
+                <input type="file" id="pdf-input" accept=".pdf" multiple hidden>
+                <button id="add-pdf-btn" class="btn btn-secondary btn-add-pdf">Add PDF</button>
                 <button id="create-send-btn" class="btn btn-primary" disabled>
                     Create & Send to Kindle
                 </button>
@@ -49,6 +51,8 @@
                 </button>
             </div>
         </div>
+
+        <div id="pdf-list" class="pdf-list"></div>
 
         <div id="loading" class="loading">
             <div class="spinner"></div>

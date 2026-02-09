@@ -146,6 +146,53 @@ header h1 {
     gap: 0.5rem;
 }
 
+.pdf-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.pdf-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #fef3c7;
+    color: #92400e;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.pdf-chip small {
+    color: #b45309;
+}
+
+.pdf-chip-remove {
+    background: none;
+    border: none;
+    color: #92400e;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0 0.15rem;
+    line-height: 1;
+}
+
+.pdf-chip-remove:hover {
+    color: #dc2626;
+}
+
+.btn-add-pdf {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.btn-add-pdf:hover {
+    background: #fde68a;
+}
+
 .loading {
     display: flex;
     flex-direction: column;

@@ -5,6 +5,7 @@ A local web application that fetches articles from your Readwise Reader library,
 ## Features
 
 - **Fetch articles** from Readwise Reader API (Inbox, Later, Archive, or Feed)
+- **Upload PDFs** to include local PDF documents in your digest
 - **Select articles** via checkboxes with select/deselect all
 - **Search and filter** articles by title, author, source, or summary
 - **Sort** by any column (title, author, source, word count, location, date)
@@ -89,15 +90,17 @@ See [SETUP.md](SETUP.md) for detailed instructions on obtaining each credential.
 ## How It Works
 
 1. **Fetch**: The app calls the Readwise Reader API to get your saved articles (metadata only for speed)
-2. **Select**: You choose which articles to include using the web interface
-3. **Generate**: For selected articles, full HTML content is fetched and bundled into an EPUB
-4. **Send**: The EPUB is emailed to your Kindle's personal document email address
+2. **Upload** *(optional)*: Add local PDF documents via the "Add PDF" button — text is extracted automatically
+3. **Select**: You choose which articles to include using the web interface
+4. **Generate**: For selected articles (and any uploaded PDFs), full HTML content is fetched and bundled into an EPUB
+5. **Send**: The EPUB is emailed to your Kindle's personal document email address
 
 ## Tech Stack
 
 - **Backend**: Python 3.12, Flask
 - **Frontend**: Vanilla HTML/CSS/JavaScript
 - **EPUB Generation**: ebooklib
+- **PDF Extraction**: PyMuPDF (fitz)
 - **HTML Processing**: BeautifulSoup
 - **Email**: smtplib (local) / Resend API (cloud)
 
