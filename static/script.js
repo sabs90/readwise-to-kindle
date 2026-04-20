@@ -1,3 +1,5 @@
+const API_BASE = window.APP_PREFIX || '';
+
 let articles = [];
 let selectedIds = new Set();
 let uploadedPdfs = [];
@@ -83,10 +85,6 @@ function debounce(func, wait) {
 }
 
 function handleUnauthorized(response) {
-    if (response.status === 401) {
-        window.location.href = '/login';
-        return true;
-    }
     return false;
 }
 
@@ -99,7 +97,7 @@ async function fetchArticles() {
     updateSelectionInfo();
 
     const location = locationFilter.value;
-    const url = location ? `/api/articles?location=${location}` : '/api/articles';
+    const url = location ? `${API_BASE}/api/articles?location=${location}` : `${API_BASE}/api/articles`;
 
     try {
         const response = await fetch(url);
@@ -262,7 +260,7 @@ async function uploadPdf() {
 
         try {
             showProgress(`Uploading ${file.name}...`);
-            const response = await fetch('/api/upload-pdf', {
+            const response = await fetch(`${API_BASE}/api/upload-pdf`, {
                 method: 'POST',
                 body: formData
             });
@@ -348,7 +346,7 @@ async function createAndSend() {
 
     try {
         // Create EPUB
-        const createResponse = await fetch('/api/create-epub', {
+        const createResponse = await fetch(`${API_BASE}/api/create-epub`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -373,7 +371,7 @@ async function createAndSend() {
         showProgress('Sending to Kindle...');
 
         // Send to Kindle
-        const sendResponse = await fetch('/api/send-to-kindle', {
+        const sendResponse = await fetch(`${API_BASE}/api/send-to-kindle`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -407,7 +405,7 @@ async function downloadEpub() {
     try {
         // Create EPUB if not already created
         if (!currentEpub) {
-            const createResponse = await fetch('/api/create-epub', {
+            const createResponse = await fetch(`${API_BASE}/api/create-epub`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -429,7 +427,7 @@ async function downloadEpub() {
         showProgress('Preparing download...');
 
         // Download
-        const downloadResponse = await fetch('/api/download-epub', {
+        const downloadResponse = await fetch(`${API_BASE}/api/download-epub`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

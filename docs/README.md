@@ -39,24 +39,9 @@ The browser will open automatically to `http://localhost:5001`.
 
 **Or use the shortcut**: Double-click `Start Readwise to Kindle.command` to launch the app.
 
-## Deployment
-
-The app can be deployed to Railway for cloud access with password protection.
-
-```bash
-# Test with gunicorn locally
-gunicorn app:app
-
-# Deploy to Railway
-# 1. Push to GitHub
-# 2. Connect repo in Railway dashboard
-# 3. Set environment variables (see Configuration)
-# 4. Deploy
-```
-
-See [SETUP.md](SETUP.md) for detailed deployment instructions.
-
 ## Configuration
+
+The app is intended for local network use (e.g. served from a NAS) and has no built-in authentication.
 
 Copy `.env.example` to `.env` and fill in your credentials:
 
@@ -64,19 +49,15 @@ Copy `.env.example` to `.env` and fill in your credentials:
 READWISE_API_TOKEN=your_token_here
 KINDLE_EMAIL=your_kindle@kindle.com
 
-# SMTP (for local use)
+# SMTP
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
 SMTP_EMAIL=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
 
-# Resend (for cloud deployment - requires verified domain)
+# Resend (alternative to SMTP - requires verified domain)
 # RESEND_API_KEY=re_xxxxxxxxx
 # FROM_EMAIL=noreply@yourdomain.com
-
-# Authentication (required for deployment, optional for local)
-APP_PASSWORD=your_secure_password
-SECRET_KEY=generate_a_random_32_char_string
 ```
 
 See [SETUP.md](SETUP.md) for detailed instructions on obtaining each credential.

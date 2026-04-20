@@ -4,14 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Readwise to Kindle</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
         <header>
             <div class="header-top">
                 <h1>Readwise to Kindle</h1>
-                <a href="/logout" class="btn btn-secondary btn-small">Logout</a>
             </div>
             <p class="subtitle">Select articles to send to your Kindle</p>
         </header>
@@ -95,6 +94,7 @@
         </div>
     </div>
 
-    <script src="/static/script.js"></script>
+    <script>window.APP_PREFIX = "{{ request.script_root }}";</script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

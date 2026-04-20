@@ -10,65 +10,15 @@ http://localhost:5000
 
 ## Authentication
 
-All endpoints except `/login` require authentication. The app uses session-based authentication with a single password.
-
-### Session Flow
-
-1. User visits any protected route
-2. Redirected to `/login` if not authenticated
-3. Enter password configured in `APP_PASSWORD` environment variable
-4. Session cookie set on successful login
-5. Session persists until logout or cookie expiration
-
-### API Authentication
-
-API endpoints return `401 Unauthorized` for unauthenticated requests:
-
-```json
-{
-  "error": "Unauthorized"
-}
-```
+The app is intended for local network use only and has no authentication.
 
 ---
 
 ## Endpoints
 
-### GET /login
-
-Serves the login page.
-
-**Response**: HTML login form
-
----
-
-### POST /login
-
-Authenticates the user.
-
-**Request Body** (form data)
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `password` | string | The app password |
-
-**Success Response**: Redirect to `/`
-
-**Error Response**: Re-renders login page with error message
-
----
-
-### GET /logout
-
-Logs out the user and clears the session.
-
-**Response**: Redirect to `/login`
-
----
-
 ### GET /
 
-Serves the main web interface. **Requires authentication.**
+Serves the main web interface.
 
 **Response**: HTML page
 
@@ -76,7 +26,7 @@ Serves the main web interface. **Requires authentication.**
 
 ### GET /api/articles
 
-Fetches articles from Readwise Reader. **Requires authentication.**
+Fetches articles from Readwise Reader.
 
 **Query Parameters**
 
@@ -111,7 +61,6 @@ Fetches articles from Readwise Reader. **Requires authentication.**
 
 | Status | Description |
 |--------|-------------|
-| 401 | Unauthorized (not logged in) |
 | 429 | Rate limited by Readwise API |
 | 500 | Failed to fetch articles |
 
@@ -119,7 +68,7 @@ Fetches articles from Readwise Reader. **Requires authentication.**
 
 ### GET /api/article/:article_id
 
-Fetches full HTML content for a specific article. **Requires authentication.**
+Fetches full HTML content for a specific article
 
 **Path Parameters**
 
@@ -142,7 +91,6 @@ Fetches full HTML content for a specific article. **Requires authentication.**
 
 | Status | Description |
 |--------|-------------|
-| 401 | Unauthorized (not logged in) |
 | 404 | Article not found |
 | 500 | Failed to fetch article |
 
@@ -150,7 +98,7 @@ Fetches full HTML content for a specific article. **Requires authentication.**
 
 ### POST /api/upload-pdf
 
-Uploads a PDF file and extracts its text content. **Requires authentication.**
+Uploads a PDF file and extracts its text content
 
 **Request Body**: `multipart/form-data`
 
@@ -176,7 +124,6 @@ Uploads a PDF file and extracts its text content. **Requires authentication.**
 | Status | Description |
 |--------|-------------|
 | 400 | No file provided, no file selected, or not a PDF |
-| 401 | Unauthorized (not logged in) |
 | 413 | File exceeds 16MB limit |
 | 500 | Failed to process PDF |
 
@@ -189,7 +136,7 @@ Uploads a PDF file and extracts its text content. **Requires authentication.**
 
 ### POST /api/create-epub
 
-Creates an EPUB file from selected articles and/or uploaded PDFs. **Requires authentication.**
+Creates an EPUB file from selected articles and/or uploaded PDFs
 
 **Request Body**
 
@@ -225,7 +172,6 @@ Both `article_ids` and `pdf_articles` are optional, but at least one must be pro
 | Status | Description |
 |--------|-------------|
 | 400 | No articles or PDFs selected |
-| 401 | Unauthorized (not logged in) |
 | 404 | No article content found |
 | 500 | Failed to fetch article or create EPUB |
 
@@ -233,7 +179,7 @@ Both `article_ids` and `pdf_articles` are optional, but at least one must be pro
 
 ### POST /api/download-epub
 
-Downloads a previously created EPUB file. **Requires authentication.**
+Downloads a previously created EPUB file
 
 **Request Body**
 
@@ -250,14 +196,13 @@ Downloads a previously created EPUB file. **Requires authentication.**
 
 | Status | Description |
 |--------|-------------|
-| 401 | Unauthorized (not logged in) |
 | 404 | EPUB file not found |
 
 ---
 
 ### POST /api/send-to-kindle
 
-Sends the EPUB file to the configured Kindle email address. **Requires authentication.**
+Sends the EPUB file to the configured Kindle email address
 
 **Request Body**
 
@@ -282,7 +227,6 @@ Sends the EPUB file to the configured Kindle email address. **Requires authentic
 | Status | Description |
 |--------|-------------|
 | 400 | Email configuration incomplete or Kindle email not configured |
-| 401 | Unauthorized (not logged in) or SMTP authentication failed |
 | 404 | EPUB file not found |
 | 500 | Failed to send email |
 

@@ -83,7 +83,7 @@ Use a Python library like:
 ### Email Sending
 - Use Python's `smtplib` for sending
 - Support Gmail SMTP (most common)
-- Handle authentication properly
+- Handle SMTP authentication properly
 
 ## Tech Stack Suggestions
 - **Backend**: Python (Flask for simple local web server)

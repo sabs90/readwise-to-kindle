@@ -7,7 +7,6 @@ from datetime import datetime
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from functools import wraps
 
 import fitz  # PyMuPDF
 import requests
@@ -15,20 +14,19 @@ import resend
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from ebooklib import epub
-from flask import Flask, jsonify, redirect, render_template, request, send_file, session, url_for
+from flask import Flask, jsonify, render_template, request, send_file
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+# Respect X-Forwarded-Prefix so url_for() produces correct URLs
+# when served under a sub-path (e.g. /readwise/) via Caddy.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1, x_proto=1, x_host=1)
 app.config.update(
-    SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production",
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
     MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16MB upload limit
 )
 
-APP_PASSWORD = os.getenv("APP_PASSWORD")
 READWISE_API_TOKEN = os.getenv("READWISE_API_TOKEN")
 KINDLE_EMAIL = os.getenv("KINDLE_EMAIL")
 
@@ -51,51 +49,16 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 READWISE_API_BASE = "https://readwise.io/api/v3"
 
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get("authenticated"):
-            if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"error": "Unauthorized"}), 401
-            return redirect(url_for("login"))
-        return f(*args, **kwargs)
-    return decorated_function
-
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if session.get("authenticated"):
-        return redirect(url_for("index"))
-
-    error = None
-    if request.method == "POST":
-        password = request.form.get("password", "")
-        if APP_PASSWORD and password == APP_PASSWORD:
-            session["authenticated"] = True
-            return redirect(url_for("index"))
-        error = "Invalid password"
-
-    return render_template("login.html", error=error)
-
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
-
-
 def get_headers():
     return {"Authorization": f"Token {READWISE_API_TOKEN}"}
 
 
 @app.route("/")
-@login_required
 def index():
     return render_template("index.html")
 
 
 @app.route("/api/articles")
-@login_required
 def get_articles():
     """Fetch articles from Readwise Reader API."""
     location = request.args.get("location", "")
@@ -153,7 +116,6 @@ def get_articles():
 
 
 @app.route("/api/article/<article_id>")
-@login_required
 def get_article_content(article_id):
     """Fetch full HTML content for a specific article."""
     try:
@@ -238,7 +200,6 @@ def extract_pdf_content(filepath):
 
 
 @app.route("/api/upload-pdf", methods=["POST"])
-@login_required
 def upload_pdf():
     """Upload a PDF file and extract its text content."""
     if "file" not in request.files:
@@ -449,7 +410,6 @@ def create_epub(articles_data, book_title, filename):
 
 
 @app.route("/api/create-epub", methods=["POST"])
-@login_required
 def create_epub_endpoint():
     """Fetch content for selected articles and create EPUB."""
     data = request.get_json()
@@ -509,7 +469,6 @@ def create_epub_endpoint():
 
 
 @app.route("/api/download-epub", methods=["POST"])
-@login_required
 def download_epub():
     """Download the generated EPUB file."""
     data = request.get_json()
@@ -523,7 +482,6 @@ def download_epub():
 
 
 @app.route("/api/send-to-kindle", methods=["POST"])
-@login_required
 def send_to_kindle():
     """Send the EPUB file to Kindle via Resend (cloud) or SMTP (local)."""
     data = request.get_json()
